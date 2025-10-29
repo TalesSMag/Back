@@ -14,7 +14,7 @@ import { Servico } from './models/Servico.js';
 import { MaterialPedido } from './models/MaterialPedido.js';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 8080;
 
 // Middleware para parsear JSON
 app.use(express.json());

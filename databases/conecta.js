@@ -1,8 +1,10 @@
-import { Sequelize } from 'sequelize';
+import { Sequelize } from "sequelize";
 
-export const sequelize = new Sequelize(
-  "os", "root", "", {
+export const sequelize = new Sequelize(process.env.MYSQL_URL, {
   dialect: "mysql",
-  host: "localhost",
-  port: 3306
+  dialectOptions: {
+    ssl: {
+      require: false,
+    },
+  },
 });

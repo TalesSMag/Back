@@ -20,10 +20,23 @@ const PORT = process.env.PORT || 8080;
 app.use(express.json());
 
 // Middleware para habilitar CORS
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://telnet-react.vercel.app'
+];
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-  credentials: true // permite cookies cross-origin
+  origin: function(origin, callback){
+    if(!origin) return callback(null, true); // allow non-browser requests
+    if(allowedOrigins.indexOf(origin) === -1){
+      const msg = `O CORS para ${origin} não é permitido!`;
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true
 }));
+
 
 // Cookie parser
 app.use(cookieParser());

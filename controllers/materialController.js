@@ -177,34 +177,32 @@ export const materialUpload = async (req, res) => {
     }
 
     console.log("req.file:", req.file);
-    console.log("req.body:", req.body);
 
     const filePath = req.file.path;
     const ext = req.file.originalname.split(".").pop().toLowerCase();
-
     let registros = [];
 
+    // 📘 PROCESSA CSV
     if (ext === "csv") {
       console.log("Processando CSV...");
       fs.createReadStream(filePath)
         .pipe(csvParser())
         .on("data", (row) => {
-          // converte preco para número e adiciona registro
-          registros.push({
-            descricao: row.Descricao,
-            marca: row.Marca,
-            preco: parseFloat(row.Preco) || 0,
-          });
+          const descricao = row["descricao"] || row["Descricao"] || "";
+          const marca = row["marca"] || row["Marca"] || "";
+          const preco = parseFloat(row["preco"] || row["Preco"] || 0);
+          const incompleto = !(marca && marca.trim() !== "" && preco > 0);
+
+          registros.push({ descricao, marca, preco, incompleto });
         })
         .on("end", async () => {
           let inseridos = 0;
           let atualizados = 0;
-          
-          // upsert: atualiza se já existe, senão cria novo
+
           for (const reg of registros) {
             const [material, created] = await Material.upsert(reg, {
-              where: { descricao: reg.Descricao, marca: reg.Marca },
-              returning: true
+              where: { descricao: reg.descricao, marca: reg.marca },
+              returning: true,
             });
             created ? inseridos++ : atualizados++;
           }
@@ -213,7 +211,7 @@ export const materialUpload = async (req, res) => {
             msg: "Processamento CSV concluído",
             count: registros.length,
             inseridos,
-            atualizados
+            atualizados,
           });
         })
         .on("error", (err) => {
@@ -221,25 +219,32 @@ export const materialUpload = async (req, res) => {
           res.status(500).json({ error: err.message });
         });
 
-    } else if (ext === "xlsx" || ext === "xls") {
+      return;
+    }
+
+    // 📗 PROCESSA EXCEL
+    if (ext === "xlsx" || ext === "xls") {
       console.log("Processando Excel...");
       const workbook = XLSX.readFile(filePath);
       const sheetName = workbook.SheetNames[0];
       const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-      registros = data.map((row) => ({
-        descricao: row["Descricao"] || row["descricao"] || "",
-        marca: row["Marca"] || row["marca"] || "",
-        preco: parseFloat(row["Preco"] || row["preco"] || 0),
-      }));
-      
+      registros = data.map((row) => {
+        const descricao = row["descricao"] || row["Descricao"] || "";
+        const marca = row["marca"] || row["Marca"] || "";
+        const preco = parseFloat(row["preco"] || row["Preco"] || 0);
+        const incompleto = !(marca && marca.trim() !== "" && preco > 0);
+
+        return { descricao, marca, preco, incompleto };
+      });
+
       let inseridos = 0;
       let atualizados = 0;
 
       for (const reg of registros) {
         const [material, created] = await Material.upsert(reg, {
           where: { descricao: reg.descricao, marca: reg.marca },
-          returning: true
+          returning: true,
         });
         created ? inseridos++ : atualizados++;
       }
@@ -248,13 +253,13 @@ export const materialUpload = async (req, res) => {
         msg: "Processamento Excel concluído",
         count: registros.length,
         inseridos,
-        atualizados
+        atualizados,
       });
 
-    } else {
-      return res.status(400).json({ msg: "Formato de arquivo não suportado" });
+      return;
     }
 
+    return res.status(400).json({ msg: "Formato de arquivo não suportado" });
   } catch (error) {
     console.error("Erro no upload:", error);
     res.status(500).json({ error: error.message });

@@ -194,12 +194,17 @@ export const materialUpload = async (req, res) => {
           .on("error", (err) => reject(err));
       });
 
-      registros = rows.map((row) => ({
-        descricao: row["descricao"] || row["Descricao"] || "",
-        marca: row["marca"] || row["Marca"] || "",
-        preco: parseFloat(row["preco"] || row["Preco"] || 0),
-        incompleto: !(row["marca"] && row["marca"].trim() !== "" && parseFloat(row["preco"]) > 0),
-      }));
+      registros = rows.map((row) => {
+        const descricao = row["descricao"] || row["Descricao"] || "";
+        const marca = row["marca"] || row["Marca"] || "";
+        const preco = parseFloat(row["preco"] || row["Preco"] || 0);
+      
+        const marcaValida = marca && marca.trim() !== "";
+        const precoValido = !isNaN(preco) && preco > 0;
+        const incompleto = !(marcaValida && precoValido);
+      
+        return { descricao, marca, preco, incompleto };
+      });
     }
 
     // 📗 EXCEL
@@ -209,12 +214,17 @@ export const materialUpload = async (req, res) => {
       const sheetName = workbook.SheetNames[0];
       const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-      registros = data.map((row) => ({
-        descricao: row["descricao"] || row["Descricao"] || "",
-        marca: row["marca"] || row["Marca"] || "",
-        preco: parseFloat(row["preco"] || row["Preco"] || 0),
-        incompleto: !(row["marca"] && row["marca"].trim() !== "" && parseFloat(row["preco"]) > 0),
-      }));
+      registros = data.map((row) => {
+        const descricao = row["descricao"] || row["Descricao"] || "";
+        const marca = row["marca"] || row["Marca"] || "";
+        const preco = parseFloat(row["preco"] || row["Preco"] || 0);
+      
+        const marcaValida = marca && marca.trim() !== "";
+        const precoValido = !isNaN(preco) && preco > 0;
+        const incompleto = !(marcaValida && precoValido);
+      
+        return { descricao, marca, preco, incompleto };
+      });
     }
 
     if (registros.length === 0) {
@@ -246,6 +256,18 @@ export const materialUpload = async (req, res) => {
         inseridos++;
       }
     }
+
+    // Corrige status de incompletos que agora estão completos
+    await Material.update(
+      { incompleto: false },
+      {
+        where: {
+          marca: { [Op.ne]: "" },
+          preco: { [Op.gt]: 0 },
+          incompleto: true,
+        },
+      }
+    );
 
     // 🔁 Remove o arquivo após o processamento
     fs.unlinkSync(filePath);

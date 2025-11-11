@@ -176,92 +176,89 @@ export const materialUpload = async (req, res) => {
       return res.status(400).json({ msg: "Nenhum arquivo enviado" });
     }
 
-    console.log("req.file:", req.file);
+    console.log("📁 Arquivo recebido:", req.file.originalname);
 
     const filePath = req.file.path;
     const ext = req.file.originalname.split(".").pop().toLowerCase();
     let registros = [];
 
-    // 📘 PROCESSA CSV
+    // 📘 CSV
     if (ext === "csv") {
-      console.log("Processando CSV...");
-      fs.createReadStream(filePath)
-        .pipe(csvParser())
-        .on("data", (row) => {
-          const descricao = row["descricao"] || row["Descricao"] || "";
-          const marca = row["marca"] || row["Marca"] || "";
-          const preco = parseFloat(row["preco"] || row["Preco"] || 0);
-          const incompleto = !(marca && marca.trim() !== "" && preco > 0);
+      console.log("📗 Processando CSV...");
+      const rows = [];
+      await new Promise((resolve, reject) => {
+        fs.createReadStream(filePath)
+          .pipe(csvParser())
+          .on("data", (row) => rows.push(row))
+          .on("end", () => resolve())
+          .on("error", (err) => reject(err));
+      });
 
-          registros.push({ descricao, marca, preco, incompleto });
-        })
-        .on("end", async () => {
-          let inseridos = 0;
-          let atualizados = 0;
-
-          for (const reg of registros) {
-            const [material, created] = await Material.upsert(reg, {
-              where: { descricao: reg.descricao, marca: reg.marca },
-              returning: true,
-            });
-            created ? inseridos++ : atualizados++;
-          }
-
-          res.json({
-            msg: "Processamento CSV concluído",
-            count: registros.length,
-            inseridos,
-            atualizados,
-          });
-        })
-        .on("error", (err) => {
-          console.error("Erro ao ler CSV:", err);
-          res.status(500).json({ error: err.message });
-        });
-
-      return;
+      registros = rows.map((row) => ({
+        descricao: row["descricao"] || row["Descricao"] || "",
+        marca: row["marca"] || row["Marca"] || "",
+        preco: parseFloat(row["preco"] || row["Preco"] || 0),
+        incompleto: !(row["marca"] && row["marca"].trim() !== "" && parseFloat(row["preco"]) > 0),
+      }));
     }
 
-    // 📗 PROCESSA EXCEL
+    // 📗 EXCEL
     if (ext === "xlsx" || ext === "xls") {
-      console.log("Processando Excel...");
+      console.log("📘 Processando Excel...");
       const workbook = XLSX.readFile(filePath);
       const sheetName = workbook.SheetNames[0];
       const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
 
-      registros = data.map((row) => {
-        const descricao = row["descricao"] || row["Descricao"] || "";
-        const marca = row["marca"] || row["Marca"] || "";
-        const preco = parseFloat(row["preco"] || row["Preco"] || 0);
-        const incompleto = !(marca && marca.trim() !== "" && preco > 0);
-
-        return { descricao, marca, preco, incompleto };
-      });
-
-      let inseridos = 0;
-      let atualizados = 0;
-
-      for (const reg of registros) {
-        const [material, created] = await Material.upsert(reg, {
-          where: { descricao: reg.descricao, marca: reg.marca },
-          returning: true,
-        });
-        created ? inseridos++ : atualizados++;
-      }
-
-      res.json({
-        msg: "Processamento Excel concluído",
-        count: registros.length,
-        inseridos,
-        atualizados,
-      });
-
-      return;
+      registros = data.map((row) => ({
+        descricao: row["descricao"] || row["Descricao"] || "",
+        marca: row["marca"] || row["Marca"] || "",
+        preco: parseFloat(row["preco"] || row["Preco"] || 0),
+        incompleto: !(row["marca"] && row["marca"].trim() !== "" && parseFloat(row["preco"]) > 0),
+      }));
     }
 
-    return res.status(400).json({ msg: "Formato de arquivo não suportado" });
+    if (registros.length === 0) {
+      return res.status(400).json({ msg: "Nenhum dado válido encontrado no arquivo." });
+    }
+
+    // ✅ Evita duplicação com verificação manual
+    let inseridos = 0;
+    let atualizados = 0;
+
+    for (const reg of registros) {
+      const existente = await Material.findOne({
+        where: {
+          descricao: reg.descricao.trim(),
+          marca: reg.marca.trim(),
+        },
+      });
+
+      if (existente) {
+        // 🔄 Atualiza se algo mudou
+        await existente.update({
+          preco: reg.preco,
+          incompleto: reg.incompleto,
+        });
+        atualizados++;
+      } else {
+        // 🆕 Cria novo registro
+        await Material.create(reg);
+        inseridos++;
+      }
+    }
+
+    // 🔁 Remove o arquivo após o processamento
+    fs.unlinkSync(filePath);
+
+    // 🔹 Retorna resposta compatível com o front-end
+    res.json({
+      msg: "📦 Upload e sincronização concluídos",
+      count: registros.length,
+      inseridos,
+      atualizados,
+    });
   } catch (error) {
-    console.error("Erro no upload:", error);
+    console.error("❌ Erro no upload:", error);
     res.status(500).json({ error: error.message });
   }
 };

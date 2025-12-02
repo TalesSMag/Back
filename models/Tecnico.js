@@ -1,5 +1,5 @@
 import { DataTypes } from 'sequelize';
-import  sequelize  from '../databases/conecta.js';
+import sequelize from '../databases/conecta.js';
 
 export const Tecnico = sequelize.define('tecnico', {
   id: {

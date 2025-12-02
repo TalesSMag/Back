@@ -1,5 +1,5 @@
 import { DataTypes } from 'sequelize';
-import  sequelize  from '../databases/conecta.js';
+import sequelize from '../databases/conecta.js';
 import { MaterialPedido, associateMaterialPedido } from './MaterialPedido.js';
 import { Cliente } from './Cliente.js';
 import { Tecnico } from './Tecnico.js';

@@ -5,7 +5,7 @@ import cookieParser from 'cookie-parser';
 import authRoutes from './routes/auth.js';
 import { authRequired } from './middleware/auth.js';
 
-import { sequelize } from './databases/conecta.js';
+import sequelize from './databases/conecta.js';
 import { Cliente } from './models/Cliente.js';
 import { Tecnico } from './models/Tecnico.js';
 import { Material } from './models/Material.js';

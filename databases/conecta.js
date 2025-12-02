@@ -1,13 +1,14 @@
-import Sequelize from "sequelize";
+import { Sequelize } from "sequelize";
 
 const dbUrl = process.env.MYSQL_URL;
 
-export const sequelize = new Sequelize(dbUrl, { dialect: "mysql", logging: false, });
-  //: new Sequelize("os", "root", "", {
-  //    dialect: "mysql",
-  //    host: "localhost",
-  //    port: 3306,
-  //  });
+export const sequelize = dbUrl
+  ?new Sequelize(dbUrl, { dialect: "mysql", logging: false, });
+  : new Sequelize("os", "root", "", {
+      dialect: "mysql",
+      host: "localhost",
+      port: 3306,
+    });
 
 try {
   await sequelize.authenticate();

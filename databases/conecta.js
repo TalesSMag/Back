@@ -4,11 +4,11 @@ const dbUrl = process.env.MYSQL_URL;
 
 export const sequelize = dbUrl
   ? new Sequelize(dbUrl, { dialect: "mysql" })
-  : new Sequelize("os", "root", "", {
-      dialect: "mysql",
-      host: "localhost",
-      port: 3306,
-    });
+  //: new Sequelize("os", "root", "", {
+  //    dialect: "mysql",
+  //    host: "localhost",
+  //    port: 3306,
+  //  });
 
 try {
   await sequelize.authenticate();
